@@ -1,17 +1,35 @@
 # Frontend – Sistema de Gestión Académica (Proyecto 2)
 
-Aplicación web de una sola página (SPA) hecha con **React + Vite + JavaScript**, **Bootstrap 5** y **React Router 6**. Consume la API REST del Proyecto 1, que está en la raíz de este mismo repositorio. No usa datos simulados: todo se lee y se guarda en la base de datos por medio de la API.
+Aplicación web de una sola página (SPA) hecha con **React + Vite + JavaScript**, **Bootstrap 5** y **React Router 6**. Consume la API REST del Proyecto 1. No usa datos simulados: todo se lee y se guarda en la base de datos por medio de la API.
+
+## Repositorios del proyecto
+
+| Parte | Repositorio |
+| --- | --- |
+| Backend (Proyecto 1, Django REST Framework) | https://github.com/Baster-david2035/Proyecto-1-Gestion-academica |
+| Frontend (Proyecto 2, este repositorio) | https://github.com/fhernandezz/frontend_proyecto2_gestion_academica |
+
+El backend se usa tal como se entregó en el Proyecto 1, sin cambios.
 
 ## Requisitos
 
 - Node.js 20 o superior (probado con Node 26 LTS) y npm.
-- El backend del Proyecto 1 funcionando (ver el `README.md` de la raíz).
+- Python y el backend del Proyecto 1 funcionando (ver el README de ese repositorio).
 
-## Cómo ejecutar el proyecto
+## Cómo ejecutar el proyecto completo
 
-### 1. Levantar el backend (Django)
+### 1. Clonar los dos repositorios
 
-Desde la raíz del repositorio, siguiendo el README principal:
+Conviene dejarlos uno al lado del otro:
+
+```powershell
+git clone https://github.com/Baster-david2035/Proyecto-1-Gestion-academica.git
+git clone https://github.com/fhernandezz/frontend_proyecto2_gestion_academica.git
+```
+
+### 2. Levantar el backend (Django)
+
+Dentro de `Proyecto-1-Gestion-academica`, siguiendo su README:
 
 ```powershell
 .\.venv\Scripts\Activate.ps1
@@ -22,12 +40,13 @@ python manage.py runserver
 
 La API queda en `http://127.0.0.1:8000/api/`.
 
-### 2. Levantar el frontend (React)
+> Para una prueba rápida sin MySQL, el backend acepta SQLite definiendo `$env:DB_ENGINE = "sqlite"` antes de `migrate` y `runserver`.
 
-En otra terminal:
+### 3. Levantar el frontend (React)
+
+En otra terminal, dentro de `frontend_proyecto2_gestion_academica`:
 
 ```powershell
-cd frontend
 npm install
 Copy-Item .env.example .env
 npm run dev
