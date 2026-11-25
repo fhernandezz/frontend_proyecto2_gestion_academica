@@ -136,7 +136,23 @@ src/
 | Horarios | Editar horario | PATCH | `/api/horarios/{id}/` |
 | Horarios | Eliminar horario | DELETE | `/api/horarios/{id}/` |
 
-*(David y Gabriel agregan aquí las filas de sus módulos.)*
+| Carreras | Listar con paginación | GET | `/api/academico/carreras/?ordering=codigo&page=&page_size=` |
+| Carreras | Crear / editar carrera | POST / PATCH | `/api/academico/carreras/` · `/api/academico/carreras/{id}/` |
+| Carreras | Eliminar carrera (409 si tiene cursos) | DELETE | `/api/academico/carreras/{id}/` |
+| Carreras → Cursos | Ver los cursos de una carrera | GET | `/api/academico/cursos/?carrera={id}` |
+| Cursos | Listar con búsqueda, filtro, orden y paginación | GET | `/api/academico/cursos/?search=&carrera=&ordering=&page=&page_size=` |
+| Cursos | Cargar carreras y cursos para selectores y prerrequisitos | GET | `/api/academico/carreras/?page_size=50` · `/api/academico/cursos/?page_size=50` |
+| Cursos | Crear / editar curso con prerrequisitos | POST / PATCH | `/api/academico/cursos/` · `/api/academico/cursos/{id}/` |
+| Cursos | Eliminar curso | DELETE | `/api/academico/cursos/{id}/` |
+| Períodos | Listar con paginación | GET | `/api/academico/periodos/?ordering=-fecha_inicio&page=&page_size=` |
+| Períodos | Crear / editar período | POST / PATCH | `/api/academico/periodos/` · `/api/academico/periodos/{id}/` |
+| Períodos | Eliminar período | DELETE | `/api/academico/periodos/{id}/` |
+| Grupos | Listar con filtros combinables y paginación | GET | `/api/academico/grupos/?curso=&periodo=&page=&page_size=` |
+| Grupos | Cargar profesores para el selector (admin) | GET | `/api/usuarios/perfiles/` |
+| Grupos | Crear / editar grupo | POST / PATCH | `/api/academico/grupos/` · `/api/academico/grupos/{id}/` |
+| Grupos | Eliminar grupo | DELETE | `/api/academico/grupos/{id}/` |
+
+*(Gabriel agrega aquí las filas de sus módulos.)*
 
 ## Matriz de perfiles y permisos (módulos de esta rama)
 
@@ -167,3 +183,32 @@ src/
 | 13 | Paginación | Con más de 10 horarios, cambiar de página | Se piden `page=2` al backend y cambia el texto "Mostrando..." |
 | 14 | Diseño adaptable | Abrir en celular o con la ventana angosta | El menú se oculta y se abre con el botón ☰ |
 | 15 | Servidor apagado | Detener Django y recargar una lista | Mensaje "No se pudo conectar con el servidor" |
+
+## Módulo Académico (parte de David)
+
+### Permisos
+
+| Acción en Carreras, Cursos, Períodos y Grupos | Admin | Profesor | Estudiante |
+| --- | --- | --- | --- |
+| Consultar | Sí | Sí | Sí |
+| Crear y editar | Sí | Sí | No (403) |
+| Eliminar | Sí | No (403) | No (403) |
+
+Los botones se muestran según el rol, pero quien decide es Django. Por ejemplo, un `DELETE` de un profesor a `/api/academico/grupos/{id}/` responde 403.
+
+### Escenarios de prueba manual
+
+| # | Escenario | Pasos | Resultado esperado |
+| --- | --- | --- | --- |
+| A1 | Crear carrera | Carreras → Nueva carrera → código y nombre → Guardar | Alerta de éxito y aparece en la tabla |
+| A2 | Código duplicado | Crear una carrera con un código que ya existe | Django responde 400 y el error aparece debajo de Código |
+| A3 | Conflicto al eliminar (409) | Eliminar una carrera que tiene cursos | Mensaje "No se puede eliminar una carrera que tiene cursos asociados" |
+| A4 | Relación carrera → cursos | En Carreras presionar "Ver cursos" | Abre Cursos con el filtro de esa carrera ya aplicado |
+| A5 | Búsqueda | En Cursos buscar "datos" | Solo aparecen cursos cuyo código o nombre contiene el texto (filtrado en el backend) |
+| A6 | Ordenamiento | En Cursos elegir "Más créditos" | La tabla se ordena con `?ordering=-creditos` |
+| A7 | Prerrequisitos | Editar un curso y marcar otro curso de la misma carrera | Se guarda y la columna Prerrequisitos muestra su código |
+| A8 | Ciclo de prerrequisitos | Marcar como prerrequisito un curso que ya depende del actual | Django rechaza con "La relación crea un ciclo de prerrequisitos" |
+| A9 | Validación de fechas | Período con fecha de fin anterior a la de inicio | Mensaje debajo de Fecha de fin y no se envía |
+| A10 | Grupo duplicado | Crear un grupo con el mismo curso, período y número | Mensaje "deben formar un conjunto único" |
+| A11 | Filtros combinables | En Grupos filtrar por curso y período | Solo aparecen los grupos que cumplen ambos filtros |
+| A12 | Permisos por rol | Entrar como profesor y como estudiante | El profesor no ve Eliminar; el estudiante solo consulta |
