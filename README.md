@@ -152,7 +152,53 @@ src/
 | Grupos | Crear / editar grupo | POST / PATCH | `/api/academico/grupos/` · `/api/academico/grupos/{id}/` |
 | Grupos | Eliminar grupo | DELETE | `/api/academico/grupos/{id}/` |
 
-*(Gabriel agrega aquí las filas de sus módulos.)*
+## Módulos Matrícula y Calificaciones (parte de Gabriel)
+
+### Pantallas y endpoints
+
+| Pantalla | Acción en la interfaz | Método | Ruta REST |
+| --- | --- | --- | --- |
+| Matrículas | Listar con filtros combinables y paginación | GET | `/api/matricula/?estado=&grupo=&search=&page=&page_size=` |
+| Matrículas | Cargar grupos para el selector | GET | `/api/academico/grupos/?page_size=50` |
+| Matrículas | Cargar estudiantes para el selector (admin) | GET | `/api/usuarios/perfiles/` |
+| Matrículas | Solicitar matrícula (estudiante) / registrar (admin) | POST | `/api/matricula/` |
+| Matrículas | Editar estado o grupo (admin) | PATCH | `/api/matricula/{id}/` |
+| Matrículas | Eliminar matrícula (admin) | DELETE | `/api/matricula/{id}/` |
+| Evaluaciones | Listar por grupo con paginación | GET | `/api/evaluaciones/?grupo=&page=&page_size=` |
+| Evaluaciones | Crear / editar evaluación | POST / PATCH | `/api/evaluaciones/` · `/api/evaluaciones/{id}/` |
+| Evaluaciones | Eliminar evaluación | DELETE | `/api/evaluaciones/{id}/` |
+| Evaluaciones | Validar que los porcentajes sumen 100% | GET | `/api/califica/{grupo_id}/validar-porcentajes/` |
+| Calificaciones | Listar con filtros combinables y paginación | GET | `/api/calificaciones/?matricula=&evaluacion=&page=&page_size=` |
+| Calificaciones | Cargar matrículas y evaluaciones para los selectores | GET | `/api/matricula/?page_size=50` · `/api/evaluaciones/?page_size=50` |
+| Calificaciones | Registrar / editar nota | POST / PATCH | `/api/calificaciones/` · `/api/calificaciones/{id}/` |
+| Calificaciones | Eliminar nota | DELETE | `/api/calificaciones/{id}/` |
+
+### Permisos
+
+| Acción | Admin | Profesor | Estudiante |
+| --- | --- | --- | --- |
+| Ver matrículas | Todas | Las de sus grupos | Solo las suyas |
+| Crear matrícula | Sí (elige estudiante) | No (403) | Sí, solo para sí mismo |
+| Editar / eliminar matrícula | Sí | No (403) | No (403) |
+| Ver evaluaciones y notas | Todas | Las de sus grupos | Las de sus grupos / sus notas |
+| Crear, editar y eliminar evaluaciones y notas | Sí | Solo en grupos que imparte | No (403) |
+
+### Escenarios de prueba manual
+
+| # | Escenario | Pasos | Resultado esperado |
+| --- | --- | --- | --- |
+| M1 | Solicitar matrícula | Como estudiante: Matrículas → Solicitar matrícula → elegir grupo | Alerta de éxito y aparece en "Mis matrículas" |
+| M2 | Prerrequisito pendiente | Como estudiante, matricular un curso cuyo prerrequisito no aprobó | Django rechaza: "no ha aprobado todos los prerrequisitos" |
+| M3 | Matrícula duplicada | Matricular dos veces el mismo grupo | Mensaje "ya tiene una matrícula registrada para ese grupo" |
+| M4 | Retirar matrícula | Como admin, editar una matrícula y poner estado Retirado | La tabla muestra la etiqueta "Retirado" |
+| M5 | Filtros combinables | Filtrar por grupo y estado a la vez | Solo aparecen las matrículas que cumplen ambos (filtrado en el backend) |
+| M6 | Permisos de matrícula | Como profesor entrar a Matrículas | Solo ve las de sus grupos y no tiene botones de acción |
+| E1 | Crear evaluación | Como profesor: Nueva evaluación en su grupo, 40% | Alerta de éxito |
+| E2 | Porcentaje excedido | Agregar otra evaluación que haga pasar la suma de 100% | Django rechaza indicando el total que quedaría |
+| E3 | Validar porcentajes | Elegir el grupo y presionar "Validar porcentajes del grupo" | Barra con el porcentaje acumulado y aviso si falta |
+| C1 | Registrar nota | Calificaciones → Registrar nota → estudiante, evaluación y nota | Aparece en la tabla con etiqueta verde (≥ 70) o roja |
+| C2 | Nota fuera de rango | Escribir 120 en la nota | Mensaje "La nota debe estar entre 0 y 100" y no se envía |
+| C3 | Notas del estudiante | Entrar como estudiante a Calificaciones | Ve "Mis calificaciones" solo con sus notas y sin botones |
 
 ## Matriz de perfiles y permisos (módulos de esta rama)
 
