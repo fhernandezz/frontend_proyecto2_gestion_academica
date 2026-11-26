@@ -1,0 +1,11 @@
+El admin es 
+Usuario: admin
+Password: admin123
+
+EL profe
+Usuario: prof.jvargas
+Password: Prueba2026!
+
+El estudiante
+Usuario: est.vrojas
+Password: Prueba2026!
