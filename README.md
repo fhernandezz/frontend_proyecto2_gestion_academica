@@ -32,11 +32,16 @@ git clone https://github.com/fhernandezz/frontend_proyecto2_gestion_academica.gi
 Dentro de `Proyecto-1-Gestion-academica`, siguiendo su README:
 
 ```powershell
+python -m venv .venv
 .\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
 docker compose up -d db
 python manage.py migrate
+python manage.py createsuperuser
 python manage.py runserver
 ```
+
+`python -m venv`, `pip install` y `createsuperuser` solo se corren la primera vez.
 
 La API queda en `http://127.0.0.1:8000/api/`.
 
@@ -116,7 +121,72 @@ src/
 | --- | --- | --- |
 | Fabricio | `fabricio-frontend` | Base del proyecto, login/logout, rutas protegidas, layout, componentes compartidos, Dashboard, Usuarios y Horarios |
 | David | `david-academico` | Carreras, Cursos, Períodos y Grupos |
-| Gabriel | `gabriel-matricula-calificaciones` | Matrículas, Evaluaciones y Calificaciones |
+| Gabriel | `gabriel` | Matrículas, Evaluaciones y Calificaciones |
+
+## Módulos y operaciones CRUD
+
+| Módulo | Pantallas | Operaciones desde la interfaz |
+| --- | --- | --- |
+| Académico | Carreras, Cursos, Períodos, Grupos | CRUD completo en las cuatro |
+| Horarios | Horarios | CRUD completo |
+| Matrícula | Matrículas | CRUD completo (el estudiante solo crea la suya; editar y eliminar es del admin) |
+| Calificaciones | Evaluaciones, Calificaciones | CRUD completo en las dos |
+| Usuarios | Usuarios | Solo consulta |
+
+### Por qué Usuarios es solo de consulta
+
+El backend del Proyecto 1 solo expone dos endpoints de usuarios, los dos de lectura: `GET /api/usuarios/perfil/` (mi perfil) y `GET /api/usuarios/perfiles/` (todos, solo admin). Crear usuarios, cambiar contraseñas o asignar roles se hace en el panel `/admin/` de Django, que es donde se definió esa gestión en el Proyecto 1.
+
+Agregar un CRUD de usuarios habría obligado a abrir endpoints nuevos para manejar contraseñas y roles, y decidimos no tocar el backend para no debilitar su seguridad. Por eso la pantalla de Usuarios muestra el perfil propio, la lista completa para el admin y sirve para demostrar el 403 con los otros roles.
+
+## Flujos entre módulos
+
+Los módulos dependen unos de otros, y la interfaz sigue ese orden:
+
+1. **Estructura académica:** una **carrera** tiene **cursos**. Un curso puede tener **prerrequisitos** de la misma carrera. Cada curso se abre en **grupos** por **período lectivo**, con un **profesor** y un cupo. Cada grupo tiene sus **horarios** (día, hora y aula).
+2. **Matrícula:** el estudiante elige un grupo. Antes de guardar, Django revisa que el período esté activo, que haya cupo, que no esté ya matriculado, que haya aprobado los prerrequisitos y que el horario no choque con sus otras matrículas.
+3. **Calificaciones:** el profesor crea las **evaluaciones** de su grupo (entre todas no pueden pasar del 100%) y registra las **notas** de cada matrícula activa. Esas notas son las que el backend usa después para saber si un curso está aprobado (nota final de 70 o más con el 100% evaluado) y dejar matricular el siguiente.
+
+En la interfaz esas relaciones se ven así:
+- Los selectores de los formularios (carrera, curso, período, profesor, grupo, matrícula, evaluación) se llenan con datos consultados a la API.
+- Las tablas muestran el nombre de lo relacionado (curso, período, profesor, estudiante) y no solo el id.
+- Desde Carreras, el botón **Ver cursos** abre Cursos ya filtrado por esa carrera.
+
+## Inventario de endpoints del backend
+
+Todos los endpoints piden `Authorization: Token <token>`, menos `/api/token/`. Sin token o con un token inválido, Django responde **401**.
+
+Las listas paginadas responden `{count, page, page_size, results}`. `page_size` es 10 por defecto y como máximo 50.
+
+| Endpoint | Métodos | Permisos | Parámetros | Respuesta (campos) | Códigos |
+| --- | --- | --- | --- | --- | --- |
+| `/api/token/` | POST | Público | `username`, `password` (body) | `token` | 200, 400 |
+| `/api/usuarios/perfil/` | GET | Cualquier usuario autenticado | — | `id`, `user {id, username, email, first_name, last_name}`, `rol`, `telefono` | 200, 401, 404 (sin perfil) |
+| `/api/usuarios/perfiles/` | GET | Solo admin | — | Lista de perfiles (mismo formato, sin paginar) | 200, 401, 403 |
+| `/api/academico/carreras/` | GET, POST | GET: todos · POST: admin y profesor | `search`, `ordering`, `page`, `page_size` | `id`, `codigo`, `nombre`, `descripcion` | 200, 201, 400, 401, 403 |
+| `/api/academico/carreras/{id}/` | GET, PUT, PATCH, DELETE | GET: todos · PUT/PATCH: admin y profesor · DELETE: solo admin | — | Igual que arriba | 200, 204, 400, 403, 404, 409 (tiene cursos) |
+| `/api/academico/cursos/` | GET, POST | GET: todos · POST: admin y profesor | `carrera`, `search`, `ordering`, `page`, `page_size` | `id`, `codigo`, `nombre`, `creditos`, `carrera`, `carrera_nombre`, `prerrequisitos[]` | 200, 201, 400, 401, 403 |
+| `/api/academico/cursos/{id}/` | GET, PUT, PATCH, DELETE | GET: todos · PUT/PATCH: admin y profesor · DELETE: solo admin | — | Igual que arriba | 200, 204, 400, 403, 404 |
+| `/api/academico/periodos/` | GET, POST | GET: todos · POST: admin y profesor | `search`, `ordering`, `page`, `page_size` | `id`, `nombre`, `fecha_inicio`, `fecha_fin`, `activo` | 200, 201, 400, 401, 403 |
+| `/api/academico/periodos/{id}/` | GET, PUT, PATCH, DELETE | GET: todos · PUT/PATCH: admin y profesor · DELETE: solo admin | — | Igual que arriba | 200, 204, 400, 403, 404 |
+| `/api/academico/grupos/` | GET, POST | GET: todos · POST: admin y profesor | `curso`, `periodo`, `search`, `ordering`, `page`, `page_size` | `id`, `curso`, `curso_nombre`, `periodo`, `periodo_nombre`, `numero_grupo`, `profesor`, `profesor_nombre`, `cupo_maximo` | 200, 201, 400, 401, 403 |
+| `/api/academico/grupos/{id}/` | GET, PUT, PATCH, DELETE | GET: todos · PUT/PATCH: admin y profesor · DELETE: solo admin | — | Igual que arriba | 200, 204, 400, 403, 404 |
+| `/api/horarios/` | GET, POST | GET: admin todos, profesor los de sus grupos, estudiante los de sus grupos matriculados · POST: admin o profesor del grupo | `grupo`, `dia`, `aula`, `page`, `page_size` | `id`, `grupo`, `grupo_detalle`, `dia`, `hora_inicio`, `hora_fin`, `aula` | 200, 201, 400, 401, 403 |
+| `/api/horarios/{id}/` | GET, PUT, PATCH, DELETE | Ver: según lo anterior · Modificar: admin o profesor del grupo | — | Igual que arriba | 200, 204, 400, 403, 404 |
+| `/api/matricula/` | GET, POST | GET: admin todas, profesor las de sus grupos, estudiante las suyas · POST: admin, o estudiante para sí mismo | `estado`, `grupo`, `search`, `page`, `page_size` | `id`, `estudiante`, `estudiante_username`, `grupo`, `grupo_detalle`, `fecha_matricula`, `estado` | 200, 201, 400, 401, 403 |
+| `/api/matricula/{id}/` | GET, PUT, PATCH, DELETE | Ver: según lo anterior · Modificar y eliminar: solo admin | — | Igual que arriba | 200, 204, 400, 403, 404 |
+| `/api/evaluaciones/` | GET, POST | GET: evaluaciones de los grupos que el usuario puede ver · POST: admin o profesor del grupo | `grupo`, `page`, `page_size` | `id`, `grupo`, `grupo_detalle`, `nombre`, `porcentaje` | 200, 201, 400, 401, 403 |
+| `/api/evaluaciones/{id}/` | GET, PUT, PATCH, DELETE | Ver: según lo anterior · Modificar: admin o profesor del grupo | — | Igual que arriba | 200, 204, 400, 403, 404 |
+| `/api/califica/{grupo_id}/validar-porcentajes/` | GET | Quien pueda ver el grupo | — | `valido`, `grupo_id`, `porcentaje_acumulado`, `porcentaje_faltante`, `porcentaje_excedido` | 200, 401, 404 |
+| `/api/calificaciones/` | GET, POST | GET: admin todas, profesor las de sus grupos, estudiante las suyas · POST: admin o profesor del grupo | `matricula`, `evaluacion`, `page`, `page_size` | `id`, `matricula`, `estudiante_nombre`, `evaluacion`, `evaluacion_nombre`, `nota_obtenida` | 200, 201, 400, 401, 403 |
+| `/api/calificaciones/{id}/` | GET, PUT, PATCH, DELETE | Ver: según lo anterior · Modificar: admin o profesor del grupo | — | Igual que arriba | 200, 204, 400, 403, 404 |
+
+Formato de los errores que muestra el frontend:
+- **400:** `{campo: ["mensaje"]}` o `{non_field_errors: [...]}`. Se muestra debajo de cada campo.
+- **401:** `{detail: "..."}`. Se cierra la sesión y se vuelve al login.
+- **403:** `{error: "..."}`. Se muestra en una alerta.
+- **404:** `{detail}` o `{error}`. Se muestra en una alerta.
+- **409:** `{error: "..."}`. Se muestra en una alerta, por ejemplo al eliminar una carrera con cursos.
 
 ## Matriz de pantallas y endpoints
 
@@ -135,7 +205,6 @@ src/
 | Horarios | Crear horario | POST | `/api/horarios/` |
 | Horarios | Editar horario | PATCH | `/api/horarios/{id}/` |
 | Horarios | Eliminar horario | DELETE | `/api/horarios/{id}/` |
-
 | Carreras | Listar con paginación | GET | `/api/academico/carreras/?ordering=codigo&page=&page_size=` |
 | Carreras | Crear / editar carrera | POST / PATCH | `/api/academico/carreras/` · `/api/academico/carreras/{id}/` |
 | Carreras | Eliminar carrera (409 si tiene cursos) | DELETE | `/api/academico/carreras/{id}/` |
@@ -200,7 +269,9 @@ src/
 | C2 | Nota fuera de rango | Escribir 120 en la nota | Mensaje "La nota debe estar entre 0 y 100" y no se envía |
 | C3 | Notas del estudiante | Entrar como estudiante a Calificaciones | Ve "Mis calificaciones" solo con sus notas y sin botones |
 
-## Matriz de perfiles y permisos (módulos de esta rama)
+## Matriz de perfiles y permisos (Dashboard, Usuarios y Horarios)
+
+Los permisos de los demás módulos están en la sección de cada uno: Matrícula y Calificaciones más arriba, y Académico más abajo.
 
 | Pantalla / acción | Admin | Profesor | Estudiante |
 | --- | --- | --- | --- |
