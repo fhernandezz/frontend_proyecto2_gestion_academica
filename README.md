@@ -258,3 +258,55 @@ Los botones se muestran según el rol, pero quien decide es Django. Por ejemplo,
 | A10 | Grupo duplicado | Crear un grupo con el mismo curso, período y número | Mensaje "deben formar un conjunto único" |
 | A11 | Filtros combinables | En Grupos filtrar por curso y período | Solo aparecen los grupos que cumplen ambos filtros |
 | A12 | Permisos por rol | Entrar como profesor y como estudiante | El profesor no ve Eliminar; el estudiante solo consulta |
+
+## Capturas
+
+Tomadas con la aplicación corriendo contra el backend real (rama `main`). Los datos se cargaron por medio de la API, así que pasaron por todas las validaciones de Django. Los usuarios y nombres son ficticios. Las imágenes están en la carpeta [`capturas/`](capturas/).
+
+### Login y dashboard
+
+| Captura | Qué muestra |
+| --- | --- |
+| [01-login](capturas/01-login.png) | Pantalla de login con usuario y contraseña |
+| [02-login-incorrecto](capturas/02-login-incorrecto.png) | Error al entrar con una contraseña equivocada |
+| [03-dashboard-admin](capturas/03-dashboard-admin.png) | Dashboard del administrador con indicadores de la API y accesos a los cinco módulos |
+| [18-dashboard-profesor](capturas/18-dashboard-profesor.png) | Dashboard del profesor (los indicadores cambian según el rol) |
+| [23-dashboard-estudiante](capturas/23-dashboard-estudiante.png) | Dashboard del estudiante |
+
+### Módulos
+
+| Captura | Qué muestra |
+| --- | --- |
+| [04-usuarios-admin](capturas/04-usuarios-admin.png) | Usuarios: mi perfil y la lista de todos los perfiles (admin) |
+| [05-carreras](capturas/05-carreras.png) | Carreras: listado con acciones y paginación |
+| [08-cursos-busqueda-orden](capturas/08-cursos-busqueda-orden.png) | Cursos: búsqueda "programación" ordenada por créditos (filtrado en el backend) |
+| [09-curso-formulario-prerrequisitos](capturas/09-curso-formulario-prerrequisitos.png) | Formulario de edición precargado, con selector de carrera y prerrequisitos |
+| [10-periodos](capturas/10-periodos.png) | Períodos lectivos activos e inactivos |
+| [12-grupos-filtros-combinados](capturas/12-grupos-filtros-combinados.png) | Grupos filtrados por curso y período a la vez |
+| [14-horarios](capturas/14-horarios.png) | Horarios con filtros por grupo, día y aula |
+| [17-matriculas-admin](capturas/17-matriculas-admin.png) | Matrículas con su estado (matriculado / retirado) |
+| [19-evaluaciones-validar-porcentajes](capturas/19-evaluaciones-validar-porcentajes.png) | Evaluaciones de un grupo y validación de porcentajes (falta 10% para el 100%) |
+| [21-calificaciones-profesor](capturas/21-calificaciones-profesor.png) | Calificaciones de los grupos del profesor |
+| [22-grupos-vista-profesor](capturas/22-grupos-vista-profesor.png) | Grupos vistos por un profesor: puede editar pero no ve Eliminar |
+| [25-calificaciones-estudiante](capturas/25-calificaciones-estudiante.png) | El estudiante solo ve sus propias notas |
+
+### Validaciones, errores y permisos
+
+| Captura | Qué muestra |
+| --- | --- |
+| [06-confirmar-eliminar](capturas/06-confirmar-eliminar.png) | Confirmación antes de borrar |
+| [07-carrera-error-409](capturas/07-carrera-error-409.png) | Error 409 al eliminar una carrera que tiene cursos |
+| [11-periodo-validacion-fechas](capturas/11-periodo-validacion-fechas.png) | Validación en el cliente: fecha de fin anterior a la de inicio |
+| [13-grupo-error-servidor-duplicado](capturas/13-grupo-error-servidor-duplicado.png) | Error 400 del servidor: grupo duplicado |
+| [15-horario-validacion-cliente](capturas/15-horario-validacion-cliente.png) | Validación en el cliente: campos obligatorios vacíos |
+| [16-horario-error-aula-ocupada](capturas/16-horario-error-aula-ocupada.png) | Error 400 del servidor mostrado debajo del campo Aula |
+| [20-evaluacion-error-supera-100](capturas/20-evaluacion-error-supera-100.png) | Regla de negocio: las evaluaciones de un grupo no pueden pasar del 100% |
+| [24-matricula-error-prerrequisito](capturas/24-matricula-error-prerrequisito.png) | Regla de negocio: no se puede matricular sin aprobar los prerrequisitos |
+| [26-error-403-sin-permisos](capturas/26-error-403-sin-permisos.png) | Error 403: un estudiante intenta consultar todos los perfiles |
+
+### Diseño adaptable
+
+| Captura | Qué muestra |
+| --- | --- |
+| [27-movil-dashboard](capturas/27-movil-dashboard.png) | Dashboard en un celular |
+| [28-movil-menu](capturas/28-movil-menu.png) | Menú abierto con el botón ☰ en el celular |
