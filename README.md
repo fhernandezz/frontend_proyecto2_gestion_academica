@@ -32,11 +32,16 @@ git clone https://github.com/fhernandezz/frontend_proyecto2_gestion_academica.gi
 Dentro de `Proyecto-1-Gestion-academica`, siguiendo su README:
 
 ```powershell
+python -m venv .venv
 .\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
 docker compose up -d db
 python manage.py migrate
+python manage.py createsuperuser
 python manage.py runserver
 ```
+
+`python -m venv`, `pip install` y `createsuperuser` solo se corren la primera vez.
 
 La API queda en `http://127.0.0.1:8000/api/`.
 
@@ -116,7 +121,72 @@ src/
 | --- | --- | --- |
 | Fabricio | `fabricio-frontend` | Base del proyecto, login/logout, rutas protegidas, layout, componentes compartidos, Dashboard, Usuarios y Horarios |
 | David | `david-academico` | Carreras, Cursos, Períodos y Grupos |
-| Gabriel | `gabriel-matricula-calificaciones` | Matrículas, Evaluaciones y Calificaciones |
+| Gabriel | `gabriel` | Matrículas, Evaluaciones y Calificaciones |
+
+## Módulos y operaciones CRUD
+
+| Módulo | Pantallas | Operaciones desde la interfaz |
+| --- | --- | --- |
+| Académico | Carreras, Cursos, Períodos, Grupos | CRUD completo en las cuatro |
+| Horarios | Horarios | CRUD completo |
+| Matrícula | Matrículas | CRUD completo (el estudiante solo crea la suya; editar y eliminar es del admin) |
+| Calificaciones | Evaluaciones, Calificaciones | CRUD completo en las dos |
+| Usuarios | Usuarios | Solo consulta |
+
+### Por qué Usuarios es solo de consulta
+
+El backend del Proyecto 1 solo expone dos endpoints de usuarios, los dos de lectura: `GET /api/usuarios/perfil/` (mi perfil) y `GET /api/usuarios/perfiles/` (todos, solo admin). Crear usuarios, cambiar contraseñas o asignar roles se hace en el panel `/admin/` de Django, que es donde se definió esa gestión en el Proyecto 1.
+
+Agregar un CRUD de usuarios habría obligado a abrir endpoints nuevos para manejar contraseñas y roles, y decidimos no tocar el backend para no debilitar su seguridad. Por eso la pantalla de Usuarios muestra el perfil propio, la lista completa para el admin y sirve para demostrar el 403 con los otros roles.
+
+## Flujos entre módulos
+
+Los módulos dependen unos de otros, y la interfaz sigue ese orden:
+
+1. **Estructura académica:** una **carrera** tiene **cursos**. Un curso puede tener **prerrequisitos** de la misma carrera. Cada curso se abre en **grupos** por **período lectivo**, con un **profesor** y un cupo. Cada grupo tiene sus **horarios** (día, hora y aula).
+2. **Matrícula:** el estudiante elige un grupo. Antes de guardar, Django revisa que el período esté activo, que haya cupo, que no esté ya matriculado, que haya aprobado los prerrequisitos y que el horario no choque con sus otras matrículas.
+3. **Calificaciones:** el profesor crea las **evaluaciones** de su grupo (entre todas no pueden pasar del 100%) y registra las **notas** de cada matrícula activa. Esas notas son las que el backend usa después para saber si un curso está aprobado (nota final de 70 o más con el 100% evaluado) y dejar matricular el siguiente.
+
+En la interfaz esas relaciones se ven así:
+- Los selectores de los formularios (carrera, curso, período, profesor, grupo, matrícula, evaluación) se llenan con datos consultados a la API.
+- Las tablas muestran el nombre de lo relacionado (curso, período, profesor, estudiante) y no solo el id.
+- Desde Carreras, el botón **Ver cursos** abre Cursos ya filtrado por esa carrera.
+
+## Inventario de endpoints del backend
+
+Todos los endpoints piden `Authorization: Token <token>`, menos `/api/token/`. Sin token o con un token inválido, Django responde **401**.
+
+Las listas paginadas responden `{count, page, page_size, results}`. `page_size` es 10 por defecto y como máximo 50.
+
+| Endpoint | Métodos | Permisos | Parámetros | Respuesta (campos) | Códigos |
+| --- | --- | --- | --- | --- | --- |
+| `/api/token/` | POST | Público | `username`, `password` (body) | `token` | 200, 400 |
+| `/api/usuarios/perfil/` | GET | Cualquier usuario autenticado | — | `id`, `user {id, username, email, first_name, last_name}`, `rol`, `telefono` | 200, 401, 404 (sin perfil) |
+| `/api/usuarios/perfiles/` | GET | Solo admin | — | Lista de perfiles (mismo formato, sin paginar) | 200, 401, 403 |
+| `/api/academico/carreras/` | GET, POST | GET: todos · POST: admin y profesor | `search`, `ordering`, `page`, `page_size` | `id`, `codigo`, `nombre`, `descripcion` | 200, 201, 400, 401, 403 |
+| `/api/academico/carreras/{id}/` | GET, PUT, PATCH, DELETE | GET: todos · PUT/PATCH: admin y profesor · DELETE: solo admin | — | Igual que arriba | 200, 204, 400, 403, 404, 409 (tiene cursos) |
+| `/api/academico/cursos/` | GET, POST | GET: todos · POST: admin y profesor | `carrera`, `search`, `ordering`, `page`, `page_size` | `id`, `codigo`, `nombre`, `creditos`, `carrera`, `carrera_nombre`, `prerrequisitos[]` | 200, 201, 400, 401, 403 |
+| `/api/academico/cursos/{id}/` | GET, PUT, PATCH, DELETE | GET: todos · PUT/PATCH: admin y profesor · DELETE: solo admin | — | Igual que arriba | 200, 204, 400, 403, 404 |
+| `/api/academico/periodos/` | GET, POST | GET: todos · POST: admin y profesor | `search`, `ordering`, `page`, `page_size` | `id`, `nombre`, `fecha_inicio`, `fecha_fin`, `activo` | 200, 201, 400, 401, 403 |
+| `/api/academico/periodos/{id}/` | GET, PUT, PATCH, DELETE | GET: todos · PUT/PATCH: admin y profesor · DELETE: solo admin | — | Igual que arriba | 200, 204, 400, 403, 404 |
+| `/api/academico/grupos/` | GET, POST | GET: todos · POST: admin y profesor | `curso`, `periodo`, `search`, `ordering`, `page`, `page_size` | `id`, `curso`, `curso_nombre`, `periodo`, `periodo_nombre`, `numero_grupo`, `profesor`, `profesor_nombre`, `cupo_maximo` | 200, 201, 400, 401, 403 |
+| `/api/academico/grupos/{id}/` | GET, PUT, PATCH, DELETE | GET: todos · PUT/PATCH: admin y profesor · DELETE: solo admin | — | Igual que arriba | 200, 204, 400, 403, 404 |
+| `/api/horarios/` | GET, POST | GET: admin todos, profesor los de sus grupos, estudiante los de sus grupos matriculados · POST: admin o profesor del grupo | `grupo`, `dia`, `aula`, `page`, `page_size` | `id`, `grupo`, `grupo_detalle`, `dia`, `hora_inicio`, `hora_fin`, `aula` | 200, 201, 400, 401, 403 |
+| `/api/horarios/{id}/` | GET, PUT, PATCH, DELETE | Ver: según lo anterior · Modificar: admin o profesor del grupo | — | Igual que arriba | 200, 204, 400, 403, 404 |
+| `/api/matricula/` | GET, POST | GET: admin todas, profesor las de sus grupos, estudiante las suyas · POST: admin, o estudiante para sí mismo | `estado`, `grupo`, `search`, `page`, `page_size` | `id`, `estudiante`, `estudiante_username`, `grupo`, `grupo_detalle`, `fecha_matricula`, `estado` | 200, 201, 400, 401, 403 |
+| `/api/matricula/{id}/` | GET, PUT, PATCH, DELETE | Ver: según lo anterior · Modificar y eliminar: solo admin | — | Igual que arriba | 200, 204, 400, 403, 404 |
+| `/api/evaluaciones/` | GET, POST | GET: evaluaciones de los grupos que el usuario puede ver · POST: admin o profesor del grupo | `grupo`, `page`, `page_size` | `id`, `grupo`, `grupo_detalle`, `nombre`, `porcentaje` | 200, 201, 400, 401, 403 |
+| `/api/evaluaciones/{id}/` | GET, PUT, PATCH, DELETE | Ver: según lo anterior · Modificar: admin o profesor del grupo | — | Igual que arriba | 200, 204, 400, 403, 404 |
+| `/api/califica/{grupo_id}/validar-porcentajes/` | GET | Quien pueda ver el grupo | — | `valido`, `grupo_id`, `porcentaje_acumulado`, `porcentaje_faltante`, `porcentaje_excedido` | 200, 401, 404 |
+| `/api/calificaciones/` | GET, POST | GET: admin todas, profesor las de sus grupos, estudiante las suyas · POST: admin o profesor del grupo | `matricula`, `evaluacion`, `page`, `page_size` | `id`, `matricula`, `estudiante_nombre`, `evaluacion`, `evaluacion_nombre`, `nota_obtenida` | 200, 201, 400, 401, 403 |
+| `/api/calificaciones/{id}/` | GET, PUT, PATCH, DELETE | Ver: según lo anterior · Modificar: admin o profesor del grupo | — | Igual que arriba | 200, 204, 400, 403, 404 |
+
+Formato de los errores que muestra el frontend:
+- **400:** `{campo: ["mensaje"]}` o `{non_field_errors: [...]}`. Se muestra debajo de cada campo.
+- **401:** `{detail: "..."}`. Se cierra la sesión y se vuelve al login.
+- **403:** `{error: "..."}`. Se muestra en una alerta.
+- **404:** `{detail}` o `{error}`. Se muestra en una alerta.
+- **409:** `{error: "..."}`. Se muestra en una alerta, por ejemplo al eliminar una carrera con cursos.
 
 ## Matriz de pantallas y endpoints
 
@@ -135,7 +205,6 @@ src/
 | Horarios | Crear horario | POST | `/api/horarios/` |
 | Horarios | Editar horario | PATCH | `/api/horarios/{id}/` |
 | Horarios | Eliminar horario | DELETE | `/api/horarios/{id}/` |
-
 | Carreras | Listar con paginación | GET | `/api/academico/carreras/?ordering=codigo&page=&page_size=` |
 | Carreras | Crear / editar carrera | POST / PATCH | `/api/academico/carreras/` · `/api/academico/carreras/{id}/` |
 | Carreras | Eliminar carrera (409 si tiene cursos) | DELETE | `/api/academico/carreras/{id}/` |
@@ -200,7 +269,9 @@ src/
 | C2 | Nota fuera de rango | Escribir 120 en la nota | Mensaje "La nota debe estar entre 0 y 100" y no se envía |
 | C3 | Notas del estudiante | Entrar como estudiante a Calificaciones | Ve "Mis calificaciones" solo con sus notas y sin botones |
 
-## Matriz de perfiles y permisos (módulos de esta rama)
+## Matriz de perfiles y permisos (Dashboard, Usuarios y Horarios)
+
+Los permisos de los demás módulos están en la sección de cada uno: Matrícula y Calificaciones más arriba, y Académico más abajo.
 
 | Pantalla / acción | Admin | Profesor | Estudiante |
 | --- | --- | --- | --- |
@@ -258,3 +329,55 @@ Los botones se muestran según el rol, pero quien decide es Django. Por ejemplo,
 | A10 | Grupo duplicado | Crear un grupo con el mismo curso, período y número | Mensaje "deben formar un conjunto único" |
 | A11 | Filtros combinables | En Grupos filtrar por curso y período | Solo aparecen los grupos que cumplen ambos filtros |
 | A12 | Permisos por rol | Entrar como profesor y como estudiante | El profesor no ve Eliminar; el estudiante solo consulta |
+
+## Capturas
+
+Tomadas con la aplicación corriendo contra el backend real (rama `main`). Los datos se cargaron por medio de la API, así que pasaron por todas las validaciones de Django. Los usuarios y nombres son ficticios. Las imágenes están en la carpeta [`capturas/`](capturas/).
+
+### Login y dashboard
+
+| Captura | Qué muestra |
+| --- | --- |
+| [01-login](capturas/01-login.png) | Pantalla de login con usuario y contraseña |
+| [02-login-incorrecto](capturas/02-login-incorrecto.png) | Error al entrar con una contraseña equivocada |
+| [03-dashboard-admin](capturas/03-dashboard-admin.png) | Dashboard del administrador con indicadores de la API y accesos a los cinco módulos |
+| [18-dashboard-profesor](capturas/18-dashboard-profesor.png) | Dashboard del profesor (los indicadores cambian según el rol) |
+| [23-dashboard-estudiante](capturas/23-dashboard-estudiante.png) | Dashboard del estudiante |
+
+### Módulos
+
+| Captura | Qué muestra |
+| --- | --- |
+| [04-usuarios-admin](capturas/04-usuarios-admin.png) | Usuarios: mi perfil y la lista de todos los perfiles (admin) |
+| [05-carreras](capturas/05-carreras.png) | Carreras: listado con acciones y paginación |
+| [08-cursos-busqueda-orden](capturas/08-cursos-busqueda-orden.png) | Cursos: búsqueda "programación" ordenada por créditos (filtrado en el backend) |
+| [09-curso-formulario-prerrequisitos](capturas/09-curso-formulario-prerrequisitos.png) | Formulario de edición precargado, con selector de carrera y prerrequisitos |
+| [10-periodos](capturas/10-periodos.png) | Períodos lectivos activos e inactivos |
+| [12-grupos-filtros-combinados](capturas/12-grupos-filtros-combinados.png) | Grupos filtrados por curso y período a la vez |
+| [14-horarios](capturas/14-horarios.png) | Horarios con filtros por grupo, día y aula |
+| [17-matriculas-admin](capturas/17-matriculas-admin.png) | Matrículas con su estado (matriculado / retirado) |
+| [19-evaluaciones-validar-porcentajes](capturas/19-evaluaciones-validar-porcentajes.png) | Evaluaciones de un grupo y validación de porcentajes (falta 10% para el 100%) |
+| [21-calificaciones-profesor](capturas/21-calificaciones-profesor.png) | Calificaciones de los grupos del profesor |
+| [22-grupos-vista-profesor](capturas/22-grupos-vista-profesor.png) | Grupos vistos por un profesor: puede editar pero no ve Eliminar |
+| [25-calificaciones-estudiante](capturas/25-calificaciones-estudiante.png) | El estudiante solo ve sus propias notas |
+
+### Validaciones, errores y permisos
+
+| Captura | Qué muestra |
+| --- | --- |
+| [06-confirmar-eliminar](capturas/06-confirmar-eliminar.png) | Confirmación antes de borrar |
+| [07-carrera-error-409](capturas/07-carrera-error-409.png) | Error 409 al eliminar una carrera que tiene cursos |
+| [11-periodo-validacion-fechas](capturas/11-periodo-validacion-fechas.png) | Validación en el cliente: fecha de fin anterior a la de inicio |
+| [13-grupo-error-servidor-duplicado](capturas/13-grupo-error-servidor-duplicado.png) | Error 400 del servidor: grupo duplicado |
+| [15-horario-validacion-cliente](capturas/15-horario-validacion-cliente.png) | Validación en el cliente: campos obligatorios vacíos |
+| [16-horario-error-aula-ocupada](capturas/16-horario-error-aula-ocupada.png) | Error 400 del servidor mostrado debajo del campo Aula |
+| [20-evaluacion-error-supera-100](capturas/20-evaluacion-error-supera-100.png) | Regla de negocio: las evaluaciones de un grupo no pueden pasar del 100% |
+| [24-matricula-error-prerrequisito](capturas/24-matricula-error-prerrequisito.png) | Regla de negocio: no se puede matricular sin aprobar los prerrequisitos |
+| [26-error-403-sin-permisos](capturas/26-error-403-sin-permisos.png) | Error 403: un estudiante intenta consultar todos los perfiles |
+
+### Diseño adaptable
+
+| Captura | Qué muestra |
+| --- | --- |
+| [27-movil-dashboard](capturas/27-movil-dashboard.png) | Dashboard en un celular |
+| [28-movil-menu](capturas/28-movil-menu.png) | Menú abierto con el botón ☰ en el celular |
